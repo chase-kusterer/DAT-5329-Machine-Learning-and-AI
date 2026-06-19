@@ -1,0 +1,57 @@
+############################
+## Python Environment YML ##
+## Intro to Python 2025   ##
+############################
+
+## For Terminal/Powershell ##
+# conda activate base
+# conda env update --file intro_python_env.yaml --prune
+
+name: base # name will be ignored in update
+channels:
+  - defaults
+  - conda-forge
+  - pip
+dependencies:
+  - ca-certificates
+  - certifi
+  - conda
+  - emoji
+  - fiona
+  - flask
+  - ipykernel
+  - ipython_genutils
+  - ipywidgets
+  - isort
+  - itemadapter
+  - itemloaders
+  - notebook=6.5.4
+  - numpy=1.26.4
+  - mathjax
+  - matplotlib=3.9.2
+  - openpyxl
+  - pandas=2.2.3
+  - pillow=10.4.0
+  - plotly
+  - seaborn=0.13.2
+  - scipy
+  - scikit-learn=1.5.2
+  - six
+  - sphinx
+  - stackstac
+  - statsmodels
+  - tornado=6.4.1
+  - xarray=2024.9.0
+  - lifelines=0.30.0
+  - nbconvert=7.16.4
+  - shapely
+  - sqlite
+  - tqdm=4.66.5
+  - traitlets=5.9.0
+  - pip:
+    - ipyleaflet==0.18.2
+    - ipython==8.9.0
+    - mamba
+    - kagglehub
+    - torch==2.2.0
+    - torchvision
