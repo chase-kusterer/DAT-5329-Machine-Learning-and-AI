@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Interactive Neural Network Walkthrough</title>
+</head>
+<body style="margin:0;background:#ffffff;">
+<div id="nnw">
+  <h3>Interactive Neural Network Walkthrough</h3>
+  <div class="sub">Press play to watch one small network train for five epochs, or drag the slider to step through it yourself. Hover over any piece to see what it does.</div>
+
+  <div class="checks" id="nnw-checks">
+    <span class="locked">Input Layer (always on)</span>
+    <label><input type="checkbox" data-opt="h1" checked> Hidden Layer 1</label>
+    <label><input type="checkbox" data-opt="h2" checked> Hidden Layer 2</label>
+    <label><input type="checkbox" data-opt="h3" checked> Hidden Layer 3</label>
+    <label><input type="checkbox" data-opt="bias" checked> Bias term</label>
+    <label><input type="checkbox" data-opt="bn"> Batch normalization</label>
+    <label><input type="checkbox" data-opt="dropout"> Dropout</label>
+    <label><input type="checkbox" data-opt="earlyStop"> Early stopping</label>
+    <span class="locked">Output Layer (always on)</span>
+  </div>
+
+  <div class="controls">
+    <button class="primary" id="nnw-play">&#9654; Play</button>
+    <button id="nnw-stop">&#9632; Stop</button>
+    <div class="speed-row">
+      <label class="lbl" for="nnw-speed">Speed</label>
+      <select id="nnw-speed">
+        <option value="1">1x</option>
+        <option value="2">2x</option>
+        <option value="3">3x</option>
+        <option value="4">4x</option>
+        <option value="5">5x</option>
+      </select>
+    </div>
+    <div class="slider-row">
+      <span class="lbl">Step</span>
+      <input type="range" id="nnw-slider" min="0" max="0" value="0">
+    </div>
+  </div>
+
+  <div class="status">
+    <span>Epoch: <b id="nnw-epoch">1</b> / 5</span>
+    <span>Phase: <span id="nnw-phase" class="badge fwd">forward</span></span>
+    <span>Loss: <b id="nnw-loss">--</b></span>
+    <span id="nnw-esflag" style="display:none;"><span class="badge stop">early stopped</span></span>
+  </div>
+
+  <svg id="nnw-svg" viewBox="0 0 880 340" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Neural network diagram"></svg>
+
+  <div class="legend">
+    <span><span class="dot" style="background:#2b6cb0;"></span> forward pass</span>
+    <span><span class="dot" style="background:#c05621;"></span> backward pass</span>
+    <span><span class="dot" style="background:#c9cfd6;border:1px dashed #9aa2ab;"></span> ReLU switched off</span>
+    <span><span class="xm">&#10005;</span> dropped (dropout)</span>
+    <span>BN = batch norm</span>
+  </div>
+
+  <div class="explain" id="nnw-explain">Feed the standardized input features into the network.</div>
+
+  <div class="tip" id="nnw-tip"></div>
+</div>
+
+<style>
+#nnw{position:relative;font-family:'DejaVu Sans',Arial,Helvetica,sans-serif;color:#333;
+  max-width:900px;margin:0 auto;background:#fff;border:1px solid #ddd;border-radius:10px;
+  padding:16px 18px;box-sizing:border-box;}
+#nnw *{box-sizing:border-box;}
+#nnw h3{margin:0 0 3px 0;font-size:18px;font-weight:600;}
+#nnw .sub{color:#666;font-size:12.5px;margin-bottom:12px;line-height:1.45;}
+#nnw .controls{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:10px;}
+#nnw button{font-size:13px;padding:6px 14px;border:1px solid #333;background:#fff;border-radius:6px;cursor:pointer;}
+#nnw button:hover{background:#f2f2f2;}
+#nnw button.primary{background:#333;color:#fff;}
+#nnw button.primary:hover{background:#555;}
+#nnw .slider-row{display:flex;align-items:center;gap:8px;flex:1;min-width:220px;}
+#nnw .slider-row .lbl{font-size:12px;color:#555;}
+#nnw input[type=range]{flex:1;}
+#nnw select{font-size:13px;padding:5px 8px;border:1px solid #333;background:#fff;border-radius:6px;cursor:pointer;}
+#nnw .speed-row{display:flex;align-items:center;gap:6px;}
+#nnw .speed-row .lbl{font-size:12px;color:#555;}
+#nnw .checks{display:flex;flex-wrap:wrap;gap:8px 16px;margin:2px 0 12px;padding:10px 12px;
+  border:1px dashed #ccc;border-radius:8px;font-size:13px;align-items:center;}
+#nnw .checks label{display:flex;align-items:center;gap:5px;cursor:pointer;}
+#nnw .checks .locked{color:#999;font-style:italic;}
+#nnw .status{display:flex;flex-wrap:wrap;gap:16px;font-size:13px;margin-bottom:6px;align-items:center;}
+#nnw .badge{display:inline-block;padding:1px 8px;border-radius:10px;font-size:11px;}
+#nnw .badge.fwd{background:#e4eef8;color:#2b6cb0;}
+#nnw .badge.bwd{background:#f7e9df;color:#c05621;}
+#nnw .badge.stop{background:#fde7e7;color:#a12a2a;}
+#nnw svg{width:100%;height:auto;display:block;margin-top:4px;}
+#nnw .legend{display:flex;flex-wrap:wrap;gap:14px;font-size:11.5px;color:#555;margin-top:6px;}
+#nnw .legend span{display:flex;align-items:center;gap:5px;}
+#nnw .dot{width:11px;height:11px;border-radius:50%;display:inline-block;}
+#nnw .legend .xm{color:#a12a2a;font-weight:bold;}
+#nnw .explain{margin-top:12px;padding:12px 14px;background:#f7f8fa;border-left:4px solid #333;
+  border-radius:4px;font-size:13.5px;line-height:1.5;min-height:44px;}
+#nnw .tip{position:absolute;pointer-events:none;background:#333;color:#fff;font-size:11.5px;
+  padding:5px 8px;border-radius:5px;max-width:230px;opacity:0;transition:opacity .1s;
+  z-index:50;line-height:1.35;}
+</style>
+
+<script>
+(function(){
+  var NS='http://www.w3.org/2000/svg';
+  var root=document.getElementById('nnw');
+  var svg=document.getElementById('nnw-svg');
+  var explain=document.getElementById('nnw-explain');
+  var slider=document.getElementById('nnw-slider');
+  var epochEl=document.getElementById('nnw-epoch');
+  var phaseEl=document.getElementById('nnw-phase');
+  var lossEl=document.getElementById('nnw-loss');
+  var esflag=document.getElementById('nnw-esflag');
+  var playBtn=document.getElementById('nnw-play');
+  var stopBtn=document.getElementById('nnw-stop');
+  var tip=document.getElementById('nnw-tip');
+  var speedSel=document.getElementById('nnw-speed');
+
+  var EPOCHS=5;
+  var LOSS=[0.82,0.51,0.34,0.27,0.26];
+  var COUNTS={input:3,hidden:4,output:1};
+  var BASE=950, speed=1;
+
+  var opt={h1:true,h2:true,h3:true,bias:true,bn:false,dropout:false,earlyStop:false};
+  var timeline=[], layers=[], geom=null, idx=0, timer=null;
+
+  // tooltip helpers (positioned inside the container, never fixed)
+  function showTip(e,txt){var r=root.getBoundingClientRect();tip.textContent=txt;tip.style.opacity='1';
+    tip.style.left=(e.clientX-r.left+12)+'px';tip.style.top=(e.clientY-r.top+12)+'px';}
+  function moveTip(e){var r=root.getBoundingClientRect();
+    tip.style.left=(e.clientX-r.left+12)+'px';tip.style.top=(e.clientY-r.top+12)+'px';}
+  function hideTip(){tip.style.opacity='0';}
+  function addTip(el,txt){el.style.cursor='help';
+    el.addEventListener('mouseenter',function(e){showTip(e,txt);});
+    el.addEventListener('mousemove',moveTip);
+    el.addEventListener('mouseleave',hideTip);}
+
+  // build the ordered list of layers from the checked options
+  function getLayers(){
+    var L=[{key:'input',name:'Input Layer',n:COUNTS.input,kind:'input',
+      tip:'the input layer holds the standardized feature values for one house.'}];
+    var hid=[['h1','Hidden Layer 1'],['h2','Hidden Layer 2'],['h3','Hidden Layer 3']];
+    hid.forEach(function(p){ if(opt[p[0]]) L.push({key:p[0],name:p[1],n:COUNTS.hidden,kind:'hidden',
+      tip:p[1]+' is a set of neurons that learn patterns from the layer before it.'}); });
+    L.push({key:'output',name:'Output Layer',n:COUNTS.output,kind:'output',
+      tip:'the output layer produces the single predicted value (the log sale price).'});
+    return L;
+  }
+
+  // deterministic on/off masks so the animation looks the same each run
+  function mask(seed,n,rate){
+    var m=[],alive=0;
+    for(var i=0;i<n;i++){var v=Math.abs(Math.sin(seed*12.9898+i*78.233))%1;
+      var dead=v<rate;m.push(dead);if(!dead)alive++;}
+    if(alive===0)m[0]=false;
+    var anyOff=false;for(var j=0;j<n;j++){if(m[j])anyOff=true;}
+    if(!anyOff)m[n-1]=true;
+    return m;
+  }
+  function reluMask(e,key,n){return mask(e*7+key.charCodeAt(1),n,0.4);}
+  function dropMask(e,key,n){return mask(e*31+key.charCodeAt(1)+99,n,0.3);}
+
+  // assemble every step of the five-epoch animation
+  function buildTimeline(){
+    layers=getLayers();
+    var steps=[];
+    for(var e=1;e<=EPOCHS;e++){
+      steps.push({e:e,phase:'forward',kind:'input',focus:{layer:0},
+        text:'Feed the standardized input features into the network.'});
+      for(var li=1;li<layers.length;li++){
+        steps.push({e:e,phase:'forward',kind:'weights',focus:{edge:li},
+          text:'Multiply the previous layer\u2019s outputs by the weights feeding '+layers[li].name+', then sum them up.'});
+        if(opt.bias)steps.push({e:e,phase:'forward',kind:'bias',focus:{layer:li},
+          text:'Add a bias term to every neuron in '+layers[li].name+'. Bias lets a neuron shift its output up or down.'});
+        if(layers[li].kind==='hidden'){
+          if(opt.bn)steps.push({e:e,phase:'forward',kind:'bn',focus:{layer:li},
+            text:'Batch normalization rescales the outputs of '+layers[li].name+' to a steady mean and variance, which keeps training stable.'});
+          steps.push({e:e,phase:'forward',kind:'relu',focus:{layer:li},
+            text:'Apply ReLU to '+layers[li].name+'. Every negative value is set to zero, which switches those neurons off and cancels the weights leaving them.'});
+          if(opt.dropout)steps.push({e:e,phase:'forward',kind:'dropout',focus:{layer:li},
+            text:'Dropout randomly switches off a few more neurons in '+layers[li].name+' so the network cannot lean on any single path.'});
+        }else if(layers[li].kind==='output'){
+          steps.push({e:e,phase:'forward',kind:'output',focus:{layer:li},
+            text:'The output layer combines everything into the final prediction (\u0177).'});
+        }
+      }
+      steps.push({e:e,phase:'forward',kind:'loss',focus:{comp:'loss'},
+        text:'The loss function compares the prediction to the true value. This epoch\u2019s loss is '+LOSS[e-1].toFixed(2)+'.'});
+      if(opt.earlyStop && e===EPOCHS){
+        steps.push({e:e,phase:'stop',kind:'earlystop',focus:{comp:'earlystop'},
+          text:'The loss has barely improved from the previous epoch, so early stopping ends training here in epoch 5 rather than continuing.'});
+        break;
+      }
+      steps.push({e:e,phase:'backward',kind:'grad',focus:{comp:'grad'},
+        text:'Backpropagation begins: compute the gradient of the loss for every weight (how much each weight added to the error).'});
+      for(var lb=layers.length-1;lb>=1;lb--){
+        steps.push({e:e,phase:'backward',kind:'backprop',focus:{edge:lb},
+          text:'Send the error backward from '+layers[lb].name+' to '+layers[lb-1].name+', sharing the blame across the weights.'});
+      }
+      steps.push({e:e,phase:'backward',kind:'update',focus:{comp:'update'},
+        text:'Nudge every weight a small step in the direction that lowers the loss, then move on to the next epoch.'});
+    }
+    timeline=steps;
+    slider.max=String(timeline.length-1);
+    if(idx>timeline.length-1)idx=timeline.length-1;
+  }
+
+  function el(tag,attrs){var e=document.createElementNS(NS,tag);
+    for(var k in attrs)e.setAttribute(k,attrs[k]);return e;}
+
+  // draw the network for the current set of layers
+  function buildSVG(){
+    while(svg.firstChild)svg.removeChild(svg.firstChild);
+    var W=880,H=340,top=54,bot=278;
+    var nL=layers.length,padX=90;
+    var xs=[];for(var i=0;i<nL;i++)xs.push(padX+i*((W-2*padX-70)/(nL-1)));
+    var ys=[];
+    layers.forEach(function(L){var yy=[],n=L.n,span=bot-top;
+      for(var k=0;k<n;k++)yy.push(n===1?(top+bot)/2:top+k*(span/(n-1)));ys.push(yy);});
+    geom={xs:xs,ys:ys,mid:(top+bot)/2};
+
+    // arrow marker
+    var defs=el('defs',{});
+    var mk=el('marker',{id:'nnw-arrow',markerWidth:'8',markerHeight:'8',refX:'6',refY:'3',orient:'auto'});
+    mk.appendChild(el('path',{d:'M0,0 L6,3 L0,6 Z',fill:'#999'}));
+    defs.appendChild(mk);svg.appendChild(defs);
+
+    // weight edges
+    for(var t=1;t<nL;t++){
+      for(var s=0;s<layers[t-1].n;s++){
+        for(var d=0;d<layers[t].n;d++){
+          var ln=el('line',{x1:xs[t-1],y1:ys[t-1][s],x2:xs[t],y2:ys[t][d],
+            stroke:'#b9c0c8','stroke-width':'1',opacity:'1'});
+          ln.setAttribute('class','edge');ln.dataset.edge=t;ln.dataset.src=s;
+          addTip(ln,'weights connect every neuron to the next layer. each line carries a number the network learns.');
+          svg.appendChild(ln);
+        }
+      }
+    }
+
+    // bias nodes + dashed edges
+    if(opt.bias){
+      for(var b=1;b<nL;b++){
+        var bx=xs[b]-30,by=bot+16;
+        for(var db=0;db<layers[b].n;db++){
+          svg.appendChild(el('line',{x1:bx,y1:by,x2:xs[b],y2:ys[b][db],
+            stroke:'#c9b7a0','stroke-width':'1','stroke-dasharray':'3 3'}));
+        }
+        var bc=el('circle',{cx:bx,cy:by,r:'9',fill:'#fff',stroke:'#b09a7d','stroke-dasharray':'3 2'});
+        addTip(bc,'bias node for '+layers[b].name+'. it feeds a constant into each neuron so the layer can shift its output.');
+        var bt=el('text',{x:bx,y:by+3.5,'text-anchor':'middle','font-size':'9',fill:'#8a7a5f'});bt.textContent='b';
+        svg.appendChild(bc);svg.appendChild(bt);
+      }
+    }
+
+    // neuron nodes + layer labels
+    layers.forEach(function(L,li){
+      for(var i=0;i<L.n;i++){
+        var base=L.kind==='input'?'#dfe7ef':(L.kind==='output'?'#dbe6dd':'#e7ded0');
+        var c=el('circle',{cx:xs[li],cy:ys[li][i],r:'14',fill:base,stroke:'#333','stroke-width':'1.4'});
+        c.setAttribute('class','node');c.dataset.layer=li;c.dataset.node=i;c.dataset.base=base;
+        addTip(c,L.tip);
+        svg.appendChild(c);
+      }
+      var lt=el('text',{x:xs[li],y:32,'text-anchor':'middle','font-size':'11',fill:'#333'});
+      lt.textContent=L.name;svg.appendChild(lt);
+      if(L.kind==='hidden'&&opt.bn){
+        var bn=el('text',{x:xs[li],y:44,'text-anchor':'middle','font-size':'10',fill:'#2b6cb0'});
+        bn.textContent='BN';addTip(bn,'batch normalization is applied to this layer.');svg.appendChild(bn);
+      }
+    });
+
+    // loss box + arrow from output
+    var lbx=W-56,lby=(top+bot)/2-16;
+    svg.appendChild(el('line',{x1:xs[nL-1]+14,y1:(top+bot)/2,x2:lbx-4,y2:(top+bot)/2,
+      stroke:'#999','stroke-width':'1','marker-end':'url(#nnw-arrow)'}));
+    var rect=el('rect',{x:lbx,y:lby,width:'48',height:'32',rx:'6',fill:'#f2f2f2',stroke:'#333','stroke-width':'1.4'});
+    rect.id='nnw-lossbox';
+    addTip(rect,'the loss function measures how far the prediction is from the true value. training tries to make this number smaller.');
+    var ltx=el('text',{x:lbx+24,y:lby+20,'text-anchor':'middle','font-size':'12',fill:'#333'});ltx.textContent='Loss';
+    svg.appendChild(rect);svg.appendChild(ltx);
+
+    // overlay group for on/off marks (drawn on top)
+    var ov=el('g',{});ov.id='nnw-overlay';svg.appendChild(ov);
+  }
+
+  function resetStyles(){
+    svg.querySelectorAll('circle.node').forEach(function(c){
+      c.setAttribute('fill',c.dataset.base);c.setAttribute('stroke','#333');
+      c.setAttribute('stroke-width','1.4');c.removeAttribute('stroke-dasharray');});
+    svg.querySelectorAll('line.edge').forEach(function(l){
+      l.setAttribute('stroke','#b9c0c8');l.setAttribute('stroke-width','1');l.setAttribute('opacity','1');});
+    var lb=document.getElementById('nnw-lossbox');
+    if(lb){lb.setAttribute('stroke','#333');lb.setAttribute('stroke-width','1.4');lb.setAttribute('fill','#f2f2f2');}
+    var ov=document.getElementById('nnw-overlay');if(ov)while(ov.firstChild)ov.removeChild(ov.firstChild);
+  }
+
+  function overlayMark(li,i,ch,col){
+    var ov=document.getElementById('nnw-overlay');
+    var t=el('text',{x:geom.xs[li],y:geom.ys[li][i]+3.5,'text-anchor':'middle','font-size':'11',fill:col});
+    t.textContent=ch;ov.appendChild(t);
+  }
+
+  function dimOut(li,i){
+    svg.querySelectorAll('line.edge[data-edge="'+(li+1)+'"][data-src="'+i+'"]').forEach(function(l){
+      l.setAttribute('opacity','0.12');});
+  }
+
+  function applyReLU(li,e){
+    var L=layers[li],m=reluMask(e,L.key,L.n);
+    for(var i=0;i<L.n;i++)if(m[i]){
+      var c=svg.querySelector('circle.node[data-layer="'+li+'"][data-node="'+i+'"]');
+      if(c){c.setAttribute('fill','#c9cfd6');c.setAttribute('stroke','#9aa2ab');c.setAttribute('stroke-dasharray','3 2');}
+      dimOut(li,i);overlayMark(li,i,'0','#5f6670');
+    }
+  }
+  function applyDropout(li,e){
+    var L=layers[li],m=dropMask(e,L.key,L.n);
+    for(var i=0;i<L.n;i++)if(m[i]){
+      var c=svg.querySelector('circle.node[data-layer="'+li+'"][data-node="'+i+'"]');
+      if(c){c.setAttribute('fill','#eee');c.setAttribute('stroke','#bbb');}
+      dimOut(li,i);overlayMark(li,i,'\u2715','#a12a2a');
+    }
+  }
+
+  function applyFocus(step){
+    var col=step.phase==='backward'?'#c05621':(step.phase==='stop'?'#a12a2a':'#2b6cb0');
+    var f=step.focus;
+    if(f.layer!=null){
+      for(var i=0;i<layers[f.layer].n;i++){
+        var c=svg.querySelector('circle.node[data-layer="'+f.layer+'"][data-node="'+i+'"]');
+        if(c){c.setAttribute('stroke',col);c.setAttribute('stroke-width','3');}
+      }
+    }
+    if(f.edge!=null){
+      svg.querySelectorAll('line.edge[data-edge="'+f.edge+'"]').forEach(function(l){
+        if(l.getAttribute('opacity')!=='0.12'){l.setAttribute('stroke',col);l.setAttribute('stroke-width','2');}});
+    }
+    if(f.comp){
+      var lb=document.getElementById('nnw-lossbox');
+      if(f.comp==='loss'&&lb){lb.setAttribute('stroke',col);lb.setAttribute('stroke-width','3');}
+      if(f.comp==='earlystop'&&lb){lb.setAttribute('stroke','#a12a2a');lb.setAttribute('stroke-width','3');lb.setAttribute('fill','#fde7e7');}
+      if(f.comp==='grad'||f.comp==='update'){
+        svg.querySelectorAll('line.edge').forEach(function(l){
+          if(l.getAttribute('opacity')!=='0.12'){l.setAttribute('stroke',col);l.setAttribute('stroke-width','1.6');}});
+        if(lb){lb.setAttribute('stroke',col);lb.setAttribute('stroke-width','2');}
+      }
+    }
+  }
+
+  function render(){
+    var step=timeline[idx],e=step.e;
+    epochEl.textContent=e;
+    phaseEl.textContent=step.phase==='backward'?'backward':(step.phase==='stop'?'stopped':'forward');
+    phaseEl.className='badge '+(step.phase==='backward'?'bwd':(step.phase==='stop'?'stop':'fwd'));
+    lossEl.textContent=LOSS[e-1].toFixed(2);
+    esflag.style.display=(step.kind==='earlystop')?'inline':'none';
+    explain.textContent=step.text;
+    slider.value=idx;
+    resetStyles();
+    // replay the on/off masks that happened earlier in this epoch
+    var start=idx;while(start>0&&timeline[start-1].e===e)start--;
+    for(var j=start;j<=idx;j++){
+      var s=timeline[j];
+      if(s.kind==='relu')applyReLU(s.focus.layer,e);
+      if(s.kind==='dropout')applyDropout(s.focus.layer,e);
+    }
+    applyFocus(step);
+  }
+
+  function tick(){if(idx>=timeline.length-1){stopPlay();return;}idx++;render();}
+  function startTimer(){timer=setInterval(tick,Math.round(BASE/speed));}
+  function stopPlay(){if(timer){clearInterval(timer);timer=null;}playBtn.innerHTML='&#9654; Play';}
+  function goPlay(){
+    if(timer){stopPlay();return;}
+    if(idx>=timeline.length-1)idx=0;
+    playBtn.innerHTML='&#10074;&#10074; Pause';
+    startTimer();
+  }
+
+  playBtn.addEventListener('click',goPlay);
+  stopBtn.addEventListener('click',function(){stopPlay();idx=0;render();});
+  slider.addEventListener('input',function(){stopPlay();idx=+slider.value;render();});
+  speedSel.addEventListener('change',function(){speed=+speedSel.value;if(timer){clearInterval(timer);startTimer();}});
+  root.querySelectorAll('input[data-opt]').forEach(function(cb){
+    cb.addEventListener('change',function(){opt[cb.dataset.opt]=cb.checked;stopPlay();rebuild();});
+  });
+
+  function rebuild(){buildTimeline();buildSVG();if(idx>timeline.length-1)idx=timeline.length-1;render();}
+  rebuild();
+})();
+</script>
+</body>
+</html>
